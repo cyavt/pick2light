@@ -1,0 +1,10 @@
+{
+  "dashboard": {
+    "title": "PTL System Overview",
+    "uid": "ptl-system-overview",
+    "panels": [],
+    "schemaVersion": 39,
+    "version": 1
+  },
+  "overwrite": true
+}

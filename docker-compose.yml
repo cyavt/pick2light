@@ -1,0 +1,211 @@
+version: "3.9"
+
+networks:
+  ptl-net:
+    driver: bridge
+  monitoring-net:
+    driver: bridge
+
+volumes:
+  pg_data:
+  redis_data:
+  emqx_data:
+  prometheus_data:
+  grafana_data:
+  loki_data:
+  traefik_certs:
+
+services:
+
+  # ─── EDGE LAYER ─────────────────────────────────────────────
+  traefik:
+    image: traefik:v3.0
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/traefik.yml:ro
+      - ./traefik/dynamic:/traefik/dynamic:ro
+      - traefik_certs:/letsencrypt
+    networks: [ptl-net]
+    restart: unless-stopped
+
+  authelia:
+    image: authelia/authelia:4
+    volumes:
+      - ./authelia:/config
+    networks: [ptl-net]
+    restart: unless-stopped
+
+  # ─── APPLICATION LAYER ─────────────────────────────────────
+
+  auth-service:
+    build: ./services/auth
+    environment:
+      DATABASE_URL: postgresql+asyncpg://ptl:${DB_PASSWORD}@postgres:5432/ptl_db
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+    networks: [ptl-net]
+    depends_on: [postgres, redis]
+    restart: unless-stopped
+
+  core-api:
+    build: ./services/core
+    environment:
+      DATABASE_URL: postgresql+asyncpg://ptl:${DB_PASSWORD}@postgres:5432/ptl_db
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      MQTT_BRIDGE_URL: http://mqtt-bridge:8004
+      WS_SERVICE_URL: http://ws-service:8003
+    networks: [ptl-net]
+    depends_on: [postgres, redis]
+    restart: unless-stopped
+
+  ws-service:
+    build: ./services/websocket
+    environment:
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+    networks: [ptl-net]
+    depends_on: [redis]
+    restart: unless-stopped
+
+  mqtt-bridge:
+    build: ./services/mqtt_bridge
+    environment:
+      MQTT_BROKER: emqx
+      MQTT_PORT: 1883
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      CORE_API_URL: http://core-api:8002
+      WS_SERVICE_URL: http://ws-service:8003
+    networks: [ptl-net]
+    depends_on: [emqx, redis, core-api]
+    restart: unless-stopped
+
+  # ─── MQTT BROKER ───────────────────────────────────────────
+
+  emqx:
+    image: emqx/emqx:5.6
+    ports:
+      - "1883:1883"
+      - "8083:8083"
+    environment:
+      EMQX_DASHBOARD__DEFAULT_PASSWORD: ${EMQX_PASSWORD}
+    volumes:
+      - emqx_data:/opt/emqx/data
+      - ./emqx/acl.conf:/opt/emqx/etc/acl.conf
+    networks: [ptl-net]
+    restart: unless-stopped
+
+  # ─── DATA LAYER ────────────────────────────────────────────
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ptl_db
+      POSTGRES_USER: ptl
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    command: >
+      postgres
+      -c max_connections=100
+      -c shared_buffers=256MB
+      -c effective_cache_size=512MB
+      -c log_min_duration_statement=200
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks: [ptl-net]
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks: [ptl-net]
+    restart: unless-stopped
+
+  # ─── FRONTEND ──────────────────────────────────────────────
+
+  frontend:
+    build: ./frontend
+    networks: [ptl-net]
+    restart: unless-stopped
+
+  # ─── OBSERVABILITY LAYER ───────────────────────────────────
+
+  prometheus:
+    image: prom/prometheus:v2.51
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.enable-lifecycle"
+    volumes:
+      - ./monitoring/prometheus:/etc/prometheus:ro
+      - prometheus_data:/prometheus
+    networks: [ptl-net, monitoring-net]
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.4
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+    networks: [ptl-net, monitoring-net]
+    depends_on: [prometheus, loki]
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:2.9
+    command: -config.file=/etc/loki/config.yml
+    volumes:
+      - ./monitoring/loki/config.yml:/etc/loki/config.yml:ro
+      - loki_data:/loki
+    networks: [ptl-net, monitoring-net]
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:2.9
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./monitoring/promtail/config.yml:/etc/promtail/config.yml:ro
+    networks: [monitoring-net]
+    restart: unless-stopped
+
+  # ─── EXPORTERS cho Prometheus ──────────────────────────────
+
+  pg-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15
+    environment:
+      DATA_SOURCE_NAME: "postgresql://ptl:${DB_PASSWORD}@postgres:5432/ptl_db?sslmode=disable"
+    networks: [ptl-net, monitoring-net]
+    restart: unless-stopped
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.58
+    environment:
+      REDIS_ADDR: redis://redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    networks: [ptl-net, monitoring-net]
+    restart: unless-stopped
+
+  node-exporter:
+    image: prom/node-exporter:v1.7
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+    networks: [monitoring-net]
+    restart: unless-stopped

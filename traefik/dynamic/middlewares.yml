@@ -1,0 +1,22 @@
+http:
+  middlewares:
+    authelia:
+      forwardAuth:
+        address: "http://authelia:9091/api/verify?rd=https://auth.${DOMAIN}"
+        trustForwardHeader: true
+        authResponseHeaders:
+          - Remote-User
+          - Remote-Groups
+          - Remote-Name
+          - Remote-Email
+
+    rate-limit:
+      rateLimit:
+        average: 100 # Trung bình 100 request/second
+        burst: 50 # Tối đa 50 request cùng lúc
+
+    cors:
+      headers:
+        accessControlAllowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+        accessControlAllowOriginList: ["https://${DOMAIN}", "https://app.${DOMAIN}"]
+        accessControlAllowHeaders: ["Content-Type", "Authorization"]

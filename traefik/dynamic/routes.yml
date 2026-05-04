@@ -1,0 +1,154 @@
+# =====================================================
+# Traefik Dynamic Routes — Pick-to-Light System
+# =====================================================
+# Đổi domain: chỉ cần sửa file này, Traefik tự hot-reload.
+# Không cần restart container, không cần sửa docker-compose.yml.
+#
+# Thay tất cả "yourdomain.com" bằng domain thật của bạn.
+# =====================================================
+
+http:
+
+  # ─── ROUTERS ────────────────────────────────────────────────
+
+  routers:
+
+    # Traefik Dashboard
+    traefik-dashboard:
+      rule: "Host(`traefik.yourdomain.com`)"
+      service: api@internal
+      middlewares:
+        - authelia
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+
+    # Authelia SSO
+    authelia:
+      rule: "Host(`auth.yourdomain.com`)"
+      service: authelia-svc
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+
+    # Auth API — /auth/*
+    auth-api:
+      rule: "Host(`api.yourdomain.com`) && PathPrefix(`/auth`)"
+      service: auth-service-svc
+      middlewares:
+        - cors
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+
+    # Core API — /api/*
+    core-api:
+      rule: "Host(`api.yourdomain.com`) && PathPrefix(`/api`)"
+      service: core-api-svc
+      middlewares:
+        - cors
+        - rate-limit
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+
+    # WebSocket — /ws/*
+    ws:
+      rule: "Host(`api.yourdomain.com`) && PathPrefix(`/ws`)"
+      service: ws-service-svc
+      middlewares:
+        - cors
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+
+    # Frontend — Vue.js SPA
+    frontend:
+      rule: "Host(`app.yourdomain.com`)"
+      service: frontend-svc
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+
+    # EMQX Dashboard (bảo vệ bởi Authelia)
+    emqx-dashboard:
+      rule: "Host(`emqx.yourdomain.com`)"
+      service: emqx-svc
+      middlewares:
+        - authelia
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+
+    # Grafana (bảo vệ bởi Authelia)
+    grafana:
+      rule: "Host(`grafana.yourdomain.com`)"
+      service: grafana-svc
+      middlewares:
+        - authelia
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+
+    # Prometheus (bảo vệ bởi Authelia)
+    prometheus:
+      rule: "Host(`prometheus.yourdomain.com`)"
+      service: prometheus-svc
+      middlewares:
+        - authelia
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+
+  # ─── SERVICES (backend URLs) ────────────────────────────────
+
+  services:
+
+    authelia-svc:
+      loadBalancer:
+        servers:
+          - url: "http://authelia:9091"
+
+    auth-service-svc:
+      loadBalancer:
+        servers:
+          - url: "http://auth-service:8001"
+
+    core-api-svc:
+      loadBalancer:
+        servers:
+          - url: "http://core-api:8002"
+
+    ws-service-svc:
+      loadBalancer:
+        servers:
+          - url: "http://ws-service:8003"
+
+    frontend-svc:
+      loadBalancer:
+        servers:
+          - url: "http://frontend:80"
+
+    emqx-svc:
+      loadBalancer:
+        servers:
+          - url: "http://emqx:18083"
+
+    grafana-svc:
+      loadBalancer:
+        servers:
+          - url: "http://grafana:3000"
+
+    prometheus-svc:
+      loadBalancer:
+        servers:
+          - url: "http://prometheus:9090"

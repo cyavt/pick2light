@@ -1,0 +1,142 @@
+# =====================================================
+# Pick-to-Light — Development Environment
+# =====================================================
+# Chỉ chạy các service cần thiết, không cần Traefik/Authelia/SSL.
+# Hot-reload cho tất cả Python services.
+#
+# Cách chạy:
+#   docker compose -f docker-compose.dev.yml up -d
+#
+# Xem logs:
+#   docker compose -f docker-compose.dev.yml logs -f core-api
+# =====================================================
+
+version: "3.9"
+
+networks:
+  ptl-dev:
+    driver: bridge
+
+volumes:
+  pg_data_dev:
+  redis_data_dev:
+  emqx_data_dev:
+
+services:
+
+  # ─── DATA LAYER (bắt buộc) ─────────────────────────────────
+
+  postgres:
+    image: postgres:16
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ptl_db
+      POSTGRES_USER: ptl
+      POSTGRES_PASSWORD: devpass123
+    command: >
+      postgres
+      -c max_connections=100
+      -c shared_buffers=128MB
+      -c log_min_duration_statement=200
+    volumes:
+      - pg_data_dev:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks: [ptl-dev]
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data_dev:/data
+    networks: [ptl-dev]
+
+  emqx:
+    image: emqx/emqx:5.6
+    ports:
+      - "1883:1883"     # MQTT
+      - "8083:8083"     # MQTT over WebSocket
+      - "18083:18083"   # EMQX Dashboard
+    environment:
+      EMQX_DASHBOARD__DEFAULT_PASSWORD: admin123
+    volumes:
+      - emqx_data_dev:/opt/emqx/data
+      - ./emqx/acl.conf:/opt/emqx/etc/acl.conf
+    networks: [ptl-dev]
+
+  # ─── APPLICATION LAYER (hot-reload) ────────────────────────
+
+  auth-service:
+    build: ./services/auth
+    ports:
+      - "8001:8001"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://ptl:devpass123@postgres:5432/ptl_db
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev-jwt-secret-change-me-in-production
+    volumes:
+      - ./services/auth:/app    # Hot-reload: mount source code
+    command: uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+    networks: [ptl-dev]
+    depends_on: [postgres, redis]
+
+  core-api:
+    build: ./services/core
+    ports:
+      - "8002:8002"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://ptl:devpass123@postgres:5432/ptl_db
+      REDIS_URL: redis://redis:6379
+      MQTT_BRIDGE_URL: http://mqtt-bridge:8004
+      WS_SERVICE_URL: http://ws-service:8003
+    volumes:
+      - ./services/core:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8002 --reload
+    networks: [ptl-dev]
+    depends_on: [postgres, redis]
+
+  ws-service:
+    build: ./services/websocket
+    ports:
+      - "8003:8003"
+    environment:
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - ./services/websocket:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8003 --reload
+    networks: [ptl-dev]
+    depends_on: [redis]
+
+  mqtt-bridge:
+    build: ./services/mqtt_bridge
+    ports:
+      - "8004:8004"
+    environment:
+      MQTT_BROKER: emqx
+      MQTT_PORT: 1883
+      REDIS_URL: redis://redis:6379
+      CORE_API_URL: http://core-api:8002
+      WS_SERVICE_URL: http://ws-service:8003
+    volumes:
+      - ./services/mqtt_bridge:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8004 --reload
+    networks: [ptl-dev]
+    depends_on: [emqx, redis, core-api]
+
+  # ─── FRONTEND (Vite dev server) ────────────────────────────
+
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    ports:
+      - "3000:3000"
+    environment:
+      VITE_API_URL: http://localhost:8002
+      VITE_WS_URL: ws://localhost:8003
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules        # anonymous volume to avoid overwriting
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    networks: [ptl-dev]

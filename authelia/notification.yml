@@ -1,0 +1,15 @@
+---
+# Authelia Notification Configuration
+# For production, use SMTP. For development, use filesystem.
+
+# ─── SMTP (Production) ──────────────────────────────────────
+# smtp:
+#   host: smtp.gmail.com
+#   port: 587
+#   username: your_email@gmail.com
+#   password: your_app_password
+#   sender: "PTL System <noreply@yourdomain.com>"
+
+# ─── Filesystem (Development) ───────────────────────────────
+filesystem:
+  filename: /config/notification.txt

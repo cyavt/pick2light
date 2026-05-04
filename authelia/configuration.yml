@@ -1,0 +1,76 @@
+---
+# Authelia Configuration
+# Docs: https://www.authelia.com/configuration/
+
+theme: dark
+
+server:
+  host: 0.0.0.0
+  port: 9091
+
+log:
+  level: info
+
+jwt_secret: a_very_important_secret  # Override via env
+
+default_redirection_url: https://app.yourdomain.com
+
+totp:
+  issuer: PTL System
+
+authentication_backend:
+  file:
+    path: /config/users_database.yml
+    password:
+      algorithm: argon2id
+
+session:
+  name: authelia_session
+  secret: insecure_session_secret  # Override via env
+  expiration: 3600  # 1 hour
+  inactivity: 300   # 5 minutes
+  domain: yourdomain.com
+
+regulation:
+  max_retries: 3
+  find_time: 120
+  ban_time: 300
+
+storage:
+  local:
+    path: /config/db.sqlite3
+
+notifier:
+  filesystem:
+    filename: /config/notification.txt
+
+access_control:
+  default_policy: deny
+
+  rules:
+    # Grafana — chỉ IT/DevOps được truy cập
+    - domain: grafana.yourdomain.com
+      policy: two_factor
+      subject:
+        - "group:devops"
+        - "group:admin"
+
+    # Traefik dashboard — chỉ admin
+    - domain: traefik.yourdomain.com
+      policy: two_factor
+      subject:
+        - "group:admin"
+
+    # EMQX dashboard — chỉ admin
+    - domain: emqx.yourdomain.com
+      policy: two_factor
+      subject:
+        - "group:admin"
+
+    # Vue.js app — bypass Authelia, dùng JWT của auth-service
+    - domain: app.yourdomain.com
+      policy: bypass
+
+    # API — bypass Authelia, dùng JWT của auth-service
+    - domain: api.yourdomain.com
+      policy: bypass

@@ -1,0 +1,456 @@
+/* ═══════════════════════════════════════════════════════════
+   PTL Dashboard — Inspinia Design System
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── Google Font (Inspinia uses Open Sans) ──────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap');
+
+/* ─── Design Tokens (Inspinia Light — default) ──────────── */
+:root {
+  /* Primary palette — Inspinia teal */
+  --primary: #1ab394;
+  --primary-light: #1cc09f;
+  --primary-dark: #18a689;
+  --primary-glow: rgba(26, 179, 148, 0.18);
+
+  /* Accent palette */
+  --accent: #23c6c8;
+  --accent-light: #3dd8da;
+
+  /* Semantic colors — Inspinia palette */
+  --success: #1c84c6;
+  --success-light: #1a7bb9;
+  --warning: #f8ac59;
+  --warning-light: #f7a54a;
+  --danger: #ed5565;
+  --danger-light: #ec4758;
+  --info: #23c6c8;
+
+  /* Surface colors (Inspinia light) */
+  --bg-base: #f3f3f4;
+  --bg-surface: #ffffff;
+  --bg-elevated: #f5f5f5;
+  --bg-hover: #eef0f2;
+  --bg-active: #e7eaec;
+
+  /* Text colors — Inspinia */
+  --text-primary: #676a6c;
+  --text-secondary: #888888;
+  --text-muted: #999c9e;
+  --text-inverse: #ffffff;
+  --text-heading: #2f4050;
+
+  /* Border — Inspinia #e7eaec */
+  --border: #e7eaec;
+  --border-hover: #d3d6d8;
+
+  /* Sidebar (Inspinia dark sidebar) */
+  --sidebar-bg: #2f4050;
+  --sidebar-active: #293846;
+  --sidebar-brand: #1ab394;
+  --sidebar-text: #a7b1c2;
+  --sidebar-text-active: #ffffff;
+
+  /* Shadows — subtle for Inspinia flat design */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 5px 15px rgba(0, 0, 0, 0.1);
+  --shadow-glow: none;
+
+  /* Spacing */
+  --sidebar-width: 220px;
+  --sidebar-collapsed: 70px;
+  --header-height: 62px;
+
+  /* Radius — Inspinia uses subtle rounding */
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 4px;
+  --radius-xl: 6px;
+  --radius-full: 50px;
+
+  /* Transitions */
+  --transition-fast: 200ms ease;
+  --transition-base: 300ms ease;
+  --transition-slow: 400ms ease;
+
+  /* Font — Inspinia uses Open Sans */
+  --font: 'Open Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+/* ─── Dark Theme Override ────────────────────────────────── */
+[data-theme="dark"] {
+  /* Surface colors */
+  --bg-base: #1a1f2e;
+  --bg-surface: #232838;
+  --bg-elevated: #2a3042;
+  --bg-hover: #313750;
+  --bg-active: #3a4260;
+
+  /* Text colors */
+  --text-primary: #d5d8dc;
+  --text-secondary: #8b919e;
+  --text-muted: #656d7e;
+  --text-inverse: #1a1f2e;
+  --text-heading: #e2e5e9;
+
+  /* Border */
+  --border: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.14);
+
+  /* Sidebar */
+  --sidebar-bg: #1e2231;
+  --sidebar-active: #262b3c;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 5px 20px rgba(0, 0, 0, 0.5);
+
+  /* Semantic (brighter for dark bg) */
+  --success-light: #2e9ad6;
+  --warning-light: #f9bf75;
+  --danger-light: #f0707e;
+  --primary-light: #32c9a8;
+}
+
+/* ─── Reset ──────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 13px;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg-base);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+}
+
+/* Inspinia heading weights */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-heading);
+}
+h1, h2 { font-weight: 100; }
+h3, h4, h5 { font-weight: 600; }
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+a:hover {
+  color: var(--primary-dark);
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--bg-active);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ─── App Layout ─────────────────────────────────────────── */
+.app-layout {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.app-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 20px;
+  background: var(--bg-base);
+}
+
+/* ─── Cards (Inspinia ibox style) ────────────────────────── */
+.card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 0;
+  transition: border-color var(--transition-fast);
+}
+.card:hover {
+  border-color: var(--border-hover);
+}
+/* ibox title bar style */
+.card-title {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 14px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+/* ─── Buttons (Inspinia flat) ────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-family: var(--font);
+  font-size: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+.btn:focus {
+  outline: none;
+  box-shadow: none;
+}
+.btn:active {
+  box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.125);
+}
+
+.btn-primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.btn-primary:hover {
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
+}
+
+.btn-success {
+  background: var(--success);
+  border-color: var(--success);
+  color: #fff;
+}
+.btn-success:hover {
+  background: var(--success-light);
+  border-color: var(--success-light);
+}
+
+.btn-danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+.btn-danger:hover {
+  background: var(--danger-light);
+  border-color: var(--danger-light);
+}
+
+.btn-warning {
+  background: var(--warning);
+  border-color: var(--warning);
+  color: #fff;
+}
+
+.btn-ghost {
+  background: #fff;
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+.btn-ghost:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
+}
+
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 0.85em;
+}
+
+/* ─── Badges (Inspinia label style) ──────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8em;
+  font-weight: 600;
+  color: #fff;
+}
+.badge-online { background: var(--primary); }
+.badge-offline { background: var(--danger); }
+.badge-active { background: var(--warning); }
+.badge-pending { background: var(--info); }
+.badge-completed { background: var(--success); }
+
+/* ─── Tables (Inspinia style) ────────────────────────────── */
+.table-container {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 1rem;
+  background: var(--bg-surface);
+}
+
+thead {
+  background: var(--bg-elevated);
+}
+
+th {
+  text-align: left;
+  padding: 10px 14px;
+  font-weight: 600;
+  color: var(--text-heading);
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-bottom: 1px solid var(--border);
+}
+
+td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+}
+
+tr {
+  transition: background var(--transition-fast);
+}
+tbody tr:hover {
+  background: var(--bg-hover);
+}
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ─── Progress Bar ───────────────────────────────────────── */
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-active);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+.progress-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--primary);
+  transition: width var(--transition-slow);
+}
+
+/* ─── Forms (Inspinia style) ─────────────────────────────── */
+.input {
+  width: 100%;
+  padding: 6px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 1em;
+  transition: border-color var(--transition-fast);
+  outline: none;
+}
+.input:focus {
+  border-color: var(--primary);
+  box-shadow: none;
+}
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+/* ─── Page Header (Inspinia wrapper-content style) ───────── */
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.page-header h1 {
+  font-size: 1.7rem;
+  font-weight: 100;
+  color: var(--text-heading);
+}
+.page-header p {
+  color: var(--text-secondary);
+  font-size: 0.95em;
+  margin-top: 2px;
+}
+
+/* ─── Grid Utilities ─────────────────────────────────────── */
+.grid-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* ─── Keyframes ──────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 4px rgba(26, 179, 148, 0.4); }
+  50% { box-shadow: 0 0 12px rgba(26, 179, 148, 0.7); }
+}
+
+@keyframes blink-led {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.fade-in {
+  animation: fadeIn var(--transition-slow) ease-out;
+}
+
+/* ─── Text color utilities ───────────────────────────────── */
+.text-primary { color: var(--primary) !important; }
+.text-success { color: var(--success) !important; }
+.text-warning { color: var(--warning) !important; }
+.text-danger { color: var(--danger) !important; }
+.text-info { color: var(--info) !important; }
+
+/* ─── Responsive ─────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
