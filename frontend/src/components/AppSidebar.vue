@@ -47,6 +47,7 @@ const navItems = computed(() => {
     { icon: 'fa fa-microchip', label: 'Thiết bị', to: '/devices' },
     { icon: 'fa fa-map-marker-alt', label: 'Zones', to: '/zones' },
     { icon: 'fa fa-bar-chart', label: 'Báo cáo', to: '/reports' },
+    { icon: 'fa fa-flask', label: 'Tạo đơn giả', to: '/mock-order' },
   ]
   // Admin-only menu
   if (user.value?.role === 'admin') {

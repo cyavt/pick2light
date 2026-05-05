@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     # MQTT
     MQTT_BROKER: str = "emqx"
     MQTT_PORT: int = 1883
+    MQTT_USERNAME: str = ""
+    MQTT_PASSWORD: str = ""
 
     # Redis
     REDIS_URL: str = "redis://redis:6379"

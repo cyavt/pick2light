@@ -8,6 +8,7 @@ Publishes commands to devices via EMQX.
 
 import asyncio
 import json
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -16,6 +17,9 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from config import settings
 from handlers.device_event_handler import handle_device_event
 from handlers.device_status_handler import handle_device_status
+
+log = logging.getLogger("mqtt-bridge")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
 
 # MQTT client will be initialized on startup
 mqtt_task = None
@@ -53,6 +57,8 @@ async def mqtt_listener():
             async with aiomqtt.Client(
                 hostname=settings.MQTT_BROKER,
                 port=settings.MQTT_PORT,
+                username=settings.MQTT_USERNAME or None,
+                password=settings.MQTT_PASSWORD or None,
             ) as client:
                 # Subscribe to all device events and status
                 await client.subscribe("ptl/device/+/+/event")
@@ -68,7 +74,7 @@ async def mqtt_listener():
                         await handle_device_status(topic, payload)
 
         except Exception as e:
-            print(f"MQTT connection error: {e}, reconnecting in 5s...")
+            log.error(f"MQTT connection error: {e}, reconnecting in 5s...")
             await asyncio.sleep(5)
 
 
@@ -82,11 +88,16 @@ async def send_commands(data: dict):
     """
     import aiomqtt
 
+    commands = data.get("commands", [])
+    log.info(f"Sending {len(commands)} command(s)...")
+
     async with aiomqtt.Client(
         hostname=settings.MQTT_BROKER,
         port=settings.MQTT_PORT,
+        username=settings.MQTT_USERNAME or None,
+        password=settings.MQTT_PASSWORD or None,
     ) as client:
-        for cmd in data.get("commands", []):
+        for cmd in commands:
             topic = f"ptl/device/{cmd['zone_id']}/{cmd['device_id']}/cmd"
             payload = json.dumps({
                 "action": cmd.get("action", "led_on"),
@@ -96,8 +107,9 @@ async def send_commands(data: dict):
                 "task_id": cmd.get("task_id", ""),
             })
             await client.publish(topic, payload)
+            log.info(f"→ {topic} | {payload}")
 
-    return {"status": "ok", "commands_sent": len(data.get("commands", []))}
+    return {"status": "ok", "commands_sent": len(commands)}
 
 
 @app.get("/health")

@@ -307,6 +307,7 @@ a:hover {
 .badge-active { background: var(--warning); }
 .badge-pending { background: var(--info); }
 .badge-completed { background: var(--success); }
+.badge-cancelled { background: #6c757d; }
 
 /* ─── Tables (Inspinia style) ────────────────────────────── */
 .table-container {

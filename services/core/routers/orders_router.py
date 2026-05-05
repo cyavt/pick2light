@@ -2,23 +2,33 @@
 Orders router — create, activate (barcode scan), cancel, progress, list.
 """
 
-from datetime import datetime
+import logging
+import re
+
+import httpx
+from tz import now_vn
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from config import settings
 from database import get_db
 from models.models import PickingOrder, PickingTask, Device
 from models.schemas import CreateOrderRequest, ActivateOrderRequest, OrderOut, TaskOut
 
 router = APIRouter()
+log = logging.getLogger("orders")
 
 DEFAULT_WAREHOUSE = "00000000-0000-0000-0000-000000000001"
 
 
 # ─── Helpers ─────────────────────────────────────────────────
+def _slugify(name: str) -> str:
+    return re.sub(r'[\s_]+', '-', name.strip()).lower()
+
+
 def _order_to_dict(order: PickingOrder) -> dict:
     tasks = [
         TaskOut(
@@ -49,7 +59,11 @@ async def _load_order(db: AsyncSession, order_id: str) -> PickingOrder:
     """Load order with tasks + device relationship."""
     result = await db.execute(
         select(PickingOrder)
-        .options(selectinload(PickingOrder.tasks).selectinload(PickingTask.device))
+        .options(
+            selectinload(PickingOrder.tasks)
+            .selectinload(PickingTask.device)
+            .selectinload(Device.zone)
+        )
         .where(PickingOrder.id == order_id)
     )
     order = result.scalar_one_or_none()
@@ -134,7 +148,11 @@ async def activate_order(body: ActivateOrderRequest, db: AsyncSession = Depends(
 
     result = await db.execute(
         select(PickingOrder)
-        .options(selectinload(PickingOrder.tasks).selectinload(PickingTask.device))
+        .options(
+            selectinload(PickingOrder.tasks)
+            .selectinload(PickingTask.device)
+            .selectinload(Device.zone)
+        )
         .where(PickingOrder.order_ref == body.order_ref)
     )
     order = result.scalar_one_or_none()
@@ -148,7 +166,7 @@ async def activate_order(body: ActivateOrderRequest, db: AsyncSession = Depends(
 
     # Activate order
     order.status = "active"
-    order.started_at = datetime.utcnow()
+    order.started_at = now_vn()
 
     # Activate all tasks + turn on LEDs
     activated_devices = []
@@ -159,9 +177,28 @@ async def activate_order(body: ActivateOrderRequest, db: AsyncSession = Depends(
             task.device.led_state = "on"
             activated_devices.append(task.device.device_code)
 
-    # TODO: Send MQTT commands to physical devices via mqtt-bridge
-    # for code in activated_devices:
-    #     await httpx.post(f"{settings.MQTT_BRIDGE_URL}/publish", json={...})
+    # Send LED-on commands to physical devices via mqtt-bridge
+    commands = []
+    for task in order.tasks:
+        if task.device and task.device.zone:
+            commands.append({
+                "zone_id": _slugify(task.device.zone.name),
+                "device_id": task.device.device_code,
+                "action": "led_on",
+                "color": task.device.led_color or "#00FF00",
+                "quantity": task.quantity_required,
+                "task_id": str(task.id),
+            })
+
+    if commands:
+        try:
+            async with httpx.AsyncClient(timeout=5) as client:
+                await client.post(
+                    f"{settings.MQTT_BRIDGE_URL}/internal/send-commands",
+                    json={"commands": commands},
+                )
+        except Exception as e:
+            log.warning(f"Failed to send MQTT commands: {e}")
 
     order = await _load_order(db, str(order.id))
     return {
@@ -217,11 +254,28 @@ async def cancel_order(order_id: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=400, detail=f"Đơn hàng đã {order.status}")
 
     order.status = "cancelled"
+    off_commands = []
     for task in order.tasks:
         if task.status in ("waiting", "active"):
             task.status = "skipped"
         if task.device:
             task.device.led_state = "off"
+            off_commands.append({
+                "zone_id": _slugify(task.device.zone.name) if task.device.zone else str(task.device.zone_id),
+                "device_id": task.device.device_code,
+                "action": "led_off",
+            })
+
+    # Send LED-off commands to physical devices
+    if off_commands:
+        try:
+            async with httpx.AsyncClient(timeout=5) as client:
+                await client.post(
+                    f"{settings.MQTT_BRIDGE_URL}/internal/send-commands",
+                    json={"commands": off_commands},
+                )
+        except Exception as e:
+            log.warning(f"Failed to send MQTT off commands: {e}")
 
     return {"ok": True, "message": "Đã huỷ đơn hàng"}
 

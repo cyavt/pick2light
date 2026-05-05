@@ -1,13 +1,7 @@
 # =====================================================
 # Pick-to-Light — Development Environment
 # =====================================================
-# Chỉ chạy các service cần thiết, không cần Traefik/Authelia/SSL.
-# Hot-reload cho tất cả Python services.
-#
-# Cách chạy:
 #   docker compose -f docker-compose.dev.yml up -d
-#
-# Xem logs:
 #   docker compose -f docker-compose.dev.yml logs -f core-api
 # =====================================================
 

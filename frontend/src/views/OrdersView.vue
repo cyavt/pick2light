@@ -48,8 +48,9 @@
         <option value="completed">Hoàn thành</option>
         <option value="cancelled">Đã huỷ</option>
       </select>
-      <input type="date" class="input filter-date" v-model="filterDate" title="Lọc theo ngày" />
-      <input type="month" class="input filter-month" v-model="filterMonth" title="Lọc theo tháng" />
+      <input type="date" class="input filter-date" v-model="filterFrom" title="Từ ngày" />
+      <span class="filter-sep">—</span>
+      <input type="date" class="input filter-date" v-model="filterTo" title="Đến ngày" />
       <input class="input filter-search" placeholder="Tìm mã đơn..." v-model="searchQuery" />
       <span class="filter-count">{{ filteredOrders.length }}/{{ orders.length }} đơn</span>
     </div>
@@ -171,7 +172,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuth } from '../composables/useAuth'
 
 const { authFetch } = useAuth()
@@ -179,8 +180,8 @@ const { authFetch } = useAuth()
 const loading = ref(false)
 const orders = ref([])
 const filterStatus = ref('')
-const filterDate = ref('')
-const filterMonth = ref('')
+const filterFrom = ref('')
+const filterTo = ref('')
 const searchQuery = ref('')
 const scanCode = ref('')
 const activating = ref(false)
@@ -208,28 +209,80 @@ const filteredOrders = computed(() => {
     const matchStatus = !filterStatus.value || o.status === filterStatus.value
     const matchSearch = !searchQuery.value || o.order_ref.toLowerCase().includes(searchQuery.value.toLowerCase())
 
-    // Date filter (YYYY-MM-DD)
-    let matchDate = true
-    if (filterDate.value && o.created_at) {
-      const orderDate = o.created_at.substring(0, 10) // "2026-05-04"
-      matchDate = orderDate === filterDate.value
+    // Date range filter (convert UTC → local date)
+    let matchDateRange = true
+    if ((filterFrom.value || filterTo.value) && o.created_at) {
+      const d = new Date(o.created_at)
+      const orderDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      if (filterFrom.value && orderDate < filterFrom.value) matchDateRange = false
+      if (filterTo.value && orderDate > filterTo.value) matchDateRange = false
     }
 
-    // Month filter (YYYY-MM)
-    let matchMonth = true
-    if (filterMonth.value && o.created_at) {
-      const orderMonth = o.created_at.substring(0, 7) // "2026-05"
-      matchMonth = orderMonth === filterMonth.value
-    }
-
-    return matchStatus && matchSearch && matchDate && matchMonth
+    return matchStatus && matchSearch && matchDateRange
   })
 })
 
+// ─── WebSocket ──────────────────────────────────────────────
+let ws = null
+let wsReconnectTimer = null
+const wsUrl = (import.meta.env.VITE_WS_URL || 'ws://localhost:8003') + '/ws/dashboard'
+
+function connectWS() {
+  if (ws && ws.readyState === WebSocket.OPEN) return
+
+  ws = new WebSocket(wsUrl)
+
+  ws.onopen = () => {
+    console.log('[WS] Connected to dashboard')
+  }
+
+  ws.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data)
+      console.log('[WS] Received:', data)
+      // Refresh orders when task confirmed or order updated
+      fetchOrders()
+
+      // Update selectedOrder detail if open
+      if (selectedOrder.value && data.order_id === selectedOrder.value.id) {
+        refreshSelectedOrder()
+      }
+    } catch (e) {
+      console.warn('[WS] Parse error:', e)
+    }
+  }
+
+  ws.onclose = () => {
+    console.log('[WS] Disconnected, reconnecting in 3s...')
+    wsReconnectTimer = setTimeout(connectWS, 3000)
+  }
+
+  ws.onerror = (err) => {
+    console.error('[WS] Error:', err)
+    ws.close()
+  }
+}
+
+async function refreshSelectedOrder() {
+  if (!selectedOrder.value) return
+  try {
+    const res = await authFetch(`/api/orders/${selectedOrder.value.id}`)
+    if (res.ok) {
+      selectedOrder.value = await res.json()
+    }
+  } catch { /* ignore */ }
+}
+
 onMounted(() => {
   fetchOrders()
+  connectWS()
   // Auto-focus scanner
   setTimeout(() => scanInput.value?.focus(), 300)
+})
+
+onUnmounted(() => {
+  if (wsReconnectTimer) clearTimeout(wsReconnectTimer)
+  if (ws) ws.close()
 })
 
 async function fetchOrders() {
@@ -383,7 +436,11 @@ function formatDate(iso) {
 }
 .filter-select { width: 180px; }
 .filter-date { width: 160px; }
-.filter-month { width: 160px; }
+.filter-sep {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
 .filter-search { width: 220px; }
 .filter-count {
   margin-left: auto;

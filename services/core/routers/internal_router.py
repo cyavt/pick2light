@@ -3,7 +3,7 @@ Internal router — called only by mqtt-bridge, not exposed via Traefik.
 Handles task confirmation and device heartbeat.
 """
 
-from datetime import datetime
+from tz import now_vn
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -45,7 +45,7 @@ async def confirm_task(body: ConfirmTaskRequest, db: AsyncSession = Depends(get_
     # Confirm task
     task.status = "confirmed"
     task.quantity_picked = task.quantity_required
-    task.confirmed_at = datetime.utcnow()
+    task.confirmed_at = now_vn()
 
     # Turn off LED
     device.led_state = "off"
@@ -67,7 +67,7 @@ async def confirm_task(body: ConfirmTaskRequest, db: AsyncSession = Depends(get_
         order = result.scalar_one_or_none()
         if order:
             order.status = "completed"
-            order.completed_at = datetime.utcnow()
+            order.completed_at = now_vn()
 
     return {
         "ok": True,
@@ -94,6 +94,6 @@ async def device_heartbeat(data: dict, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail=f"Device '{device_code}' not found")
 
     device.status = "online"
-    device.last_seen = datetime.utcnow()
+    device.last_seen = now_vn()
 
     return {"ok": True}

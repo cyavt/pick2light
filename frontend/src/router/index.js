@@ -39,6 +39,12 @@ const routes = [
     meta: { requiresAuth: true, adminOnly: true },
   },
   {
+    path: '/mock-order',
+    name: 'MockOrder',
+    component: () => import('../views/MockOrderView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/login',
     name: 'Login',
     component: () => import('../views/LoginView.vue'),
