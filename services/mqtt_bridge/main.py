@@ -61,8 +61,8 @@ async def mqtt_listener():
                 password=settings.MQTT_PASSWORD or None,
             ) as client:
                 # Subscribe to all device events and status
-                await client.subscribe("ptl/device/+/+/event")
-                await client.subscribe("ptl/device/+/+/status")
+                await client.subscribe("ptl/device/+/event")
+                await client.subscribe("ptl/device/+/status")
 
                 async for message in client.messages:
                     topic = str(message.topic)
@@ -98,7 +98,7 @@ async def send_commands(data: dict):
         password=settings.MQTT_PASSWORD or None,
     ) as client:
         for cmd in commands:
-            topic = f"ptl/device/{cmd['zone_id']}/{cmd['device_id']}/cmd"
+            topic = f"ptl/device/{cmd['device_id']}/cmd"
             payload = json.dumps({
                 "action": cmd.get("action", "led_on"),
                 "color": cmd.get("color", "#00FF00"),

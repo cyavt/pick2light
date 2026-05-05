@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS zones (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     warehouse_id UUID REFERENCES warehouses(id) ON DELETE CASCADE,
     name VARCHAR(50) NOT NULL,
+    slug VARCHAR(50) UNIQUE NOT NULL,
     description TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -96,12 +97,12 @@ VALUES ('00000000-0000-0000-0000-000000000001', 'Kho Chính', 'Hà Nội, Việt
 ON CONFLICT DO NOTHING;
 
 -- Default zones (A-E)
-INSERT INTO zones (id, warehouse_id, name, description) VALUES
-    ('00000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000001', 'Zone A', 'Khu vực A - Hàng tiêu dùng'),
-    ('00000000-0000-0000-0000-000000000020', '00000000-0000-0000-0000-000000000001', 'Zone B', 'Khu vực B - Điện tử'),
-    ('00000000-0000-0000-0000-000000000030', '00000000-0000-0000-0000-000000000001', 'Zone C', 'Khu vực C - Thực phẩm'),
-    ('00000000-0000-0000-0000-000000000040', '00000000-0000-0000-0000-000000000001', 'Zone D', 'Khu vực D - Văn phòng phẩm'),
-    ('00000000-0000-0000-0000-000000000050', '00000000-0000-0000-0000-000000000001', 'Zone E', 'Khu vực E - Phụ kiện')
+INSERT INTO zones (id, warehouse_id, name, slug, description) VALUES
+    ('00000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000001', 'Zone A', 'zone-a', 'Khu vực A - Hàng tiêu dùng'),
+    ('00000000-0000-0000-0000-000000000020', '00000000-0000-0000-0000-000000000001', 'Zone B', 'zone-b', 'Khu vực B - Điện tử'),
+    ('00000000-0000-0000-0000-000000000030', '00000000-0000-0000-0000-000000000001', 'Zone C', 'zone-c', 'Khu vực C - Thực phẩm'),
+    ('00000000-0000-0000-0000-000000000040', '00000000-0000-0000-0000-000000000001', 'Zone D', 'zone-d', 'Khu vực D - Văn phòng phẩm'),
+    ('00000000-0000-0000-0000-000000000050', '00000000-0000-0000-0000-000000000001', 'Zone E', 'zone-e', 'Khu vực E - Phụ kiện')
 ON CONFLICT DO NOTHING;
 
 -- Default devices (4 per zone = 20 total)

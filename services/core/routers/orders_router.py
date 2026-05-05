@@ -3,7 +3,6 @@ Orders router — create, activate (barcode scan), cancel, progress, list.
 """
 
 import logging
-import re
 
 import httpx
 from tz import now_vn
@@ -25,10 +24,6 @@ DEFAULT_WAREHOUSE = "00000000-0000-0000-0000-000000000001"
 
 
 # ─── Helpers ─────────────────────────────────────────────────
-def _slugify(name: str) -> str:
-    return re.sub(r'[\s_]+', '-', name.strip()).lower()
-
-
 def _order_to_dict(order: PickingOrder) -> dict:
     tasks = [
         TaskOut(
@@ -180,9 +175,8 @@ async def activate_order(body: ActivateOrderRequest, db: AsyncSession = Depends(
     # Send LED-on commands to physical devices via mqtt-bridge
     commands = []
     for task in order.tasks:
-        if task.device and task.device.zone:
+        if task.device:
             commands.append({
-                "zone_id": _slugify(task.device.zone.name),
                 "device_id": task.device.device_code,
                 "action": "led_on",
                 "color": task.device.led_color or "#00FF00",
@@ -261,7 +255,6 @@ async def cancel_order(order_id: str, db: AsyncSession = Depends(get_db)):
         if task.device:
             task.device.led_state = "off"
             off_commands.append({
-                "zone_id": _slugify(task.device.zone.name) if task.device.zone else str(task.device.zone_id),
                 "device_id": task.device.device_code,
                 "action": "led_off",
             })

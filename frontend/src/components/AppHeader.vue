@@ -73,7 +73,6 @@ const pageTitles = {
   '/': 'Dashboard',
   '/orders': 'Quản lý đơn hàng',
   '/devices': 'Quản lý thiết bị',
-  '/zones': 'Quản lý Zones',
   '/reports': 'Báo cáo',
   '/users': 'Quản lý tài khoản',
 }

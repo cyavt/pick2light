@@ -30,11 +30,10 @@ async def handle_device_event(topic: str, payload: dict):
     task_id = payload.get("task_id", "")
     log.info(f"Button pressed: device={device_id}, task={task_id}")
 
-    # Extract zone_id and device_id from topic
-    # Topic format: ptl/device/{zone_id}/{device_id}/event
+    # Extract device_id from topic
+    # Topic format: ptl/device/{device_id}/event
     parts = topic.split("/")
-    zone_id = parts[2]
-    topic_device_id = parts[3]
+    topic_device_id = parts[2]
 
     try:
         # 1. Call core-api to confirm task (business logic)
@@ -61,7 +60,7 @@ async def handle_device_event(topic: str, payload: dict):
             username=settings.MQTT_USERNAME or None,
             password=settings.MQTT_PASSWORD or None,
         ) as mqtt_client:
-            off_topic = f"ptl/device/{zone_id}/{topic_device_id}/cmd"
+            off_topic = f"ptl/device/{topic_device_id}/cmd"
             await mqtt_client.publish(
                 off_topic,
                 json.dumps({"action": "led_off"}),

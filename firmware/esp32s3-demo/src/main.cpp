@@ -11,7 +11,6 @@
 #define MQTT_USERNAME   ""
 #define MQTT_PASSWORD   ""
 
-#define ZONE_ID         "zone-a"
 #define DEVICE_ID       "PTL-A001"
 
 #define LED_PIN         48
@@ -20,9 +19,9 @@
 
 #define HEARTBEAT_MS    5000
 
-char topicCmd[64];     // ptl/device/zone-a/PTL-A001/cmd
-char topicEvent[64];   // ptl/device/zone-a/PTL-A001/event
-char topicStatus[64];  // ptl/device/zone-a/PTL-A001/status
+char topicCmd[64];     // ptl/device/PTL-A001/cmd
+char topicEvent[64];   // ptl/device/PTL-A001/event
+char topicStatus[64];  // ptl/device/PTL-A001/status
 
 WiFiClient espClient;
 PubSubClient mqtt(espClient);
@@ -178,7 +177,6 @@ void sendHeartbeat() {
     JsonDocument doc;
     doc["event"] = "heartbeat";
     doc["device_id"] = DEVICE_ID;
-    doc["zone_id"] = ZONE_ID;
     doc["uptime"] = millis() / 1000;
     doc["rssi"] = WiFi.RSSI();
     doc["free_heap"] = ESP.getFreeHeap();
@@ -194,11 +192,11 @@ void setup() {
     Serial.begin(115200);
     delay(1000);
     Serial.println("\n=== Pick-to-Light ESP32-S3 ===");
-    Serial.printf("Zone: %s | Device: %s\n", ZONE_ID, DEVICE_ID);
+    Serial.printf("Device: %s\n", DEVICE_ID);
 
-    snprintf(topicCmd,    sizeof(topicCmd),    "ptl/device/%s/%s/cmd",    ZONE_ID, DEVICE_ID);
-    snprintf(topicEvent,  sizeof(topicEvent),  "ptl/device/%s/%s/event",  ZONE_ID, DEVICE_ID);
-    snprintf(topicStatus, sizeof(topicStatus), "ptl/device/%s/%s/status", ZONE_ID, DEVICE_ID);
+    snprintf(topicCmd,    sizeof(topicCmd),    "ptl/device/%s/cmd",    DEVICE_ID);
+    snprintf(topicEvent,  sizeof(topicEvent),  "ptl/device/%s/event",  DEVICE_ID);
+    snprintf(topicStatus, sizeof(topicStatus), "ptl/device/%s/status", DEVICE_ID);
 
     pinMode(BUTTON_PIN, INPUT_PULLUP);
     strip.begin();

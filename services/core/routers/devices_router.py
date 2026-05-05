@@ -2,10 +2,10 @@
 Devices router — CRUD, list, test LED.
 """
 
-import re
 import logging
 
 import httpx
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,14 +13,22 @@ from sqlalchemy.orm import selectinload
 
 from config import settings
 from database import get_db
-from models.models import Device, Zone
+from models.models import Device, Zone, PickingTask
 
 router = APIRouter()
 log = logging.getLogger("devices")
 
 
-def _slugify(name: str) -> str:
-    return re.sub(r'[\s_]+', '-', name.strip()).lower()
+class CreateDeviceRequest(BaseModel):
+    device_code: str
+    location: str = ""
+
+
+class UpdateDeviceRequest(BaseModel):
+    device_code: str | None = None
+    location: str | None = None
+
+
 
 
 @router.get("/")
@@ -96,6 +104,77 @@ async def get_device(device_id: str, db: AsyncSession = Depends(get_db)):
     }
 
 
+@router.post("/", status_code=201)
+async def create_device(body: CreateDeviceRequest, db: AsyncSession = Depends(get_db)):
+    """Create a new device."""
+    # Check unique device_code
+    existing = await db.execute(select(Device).where(Device.device_code == body.device_code))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail=f"Mã thiết bị '{body.device_code}' đã tồn tại")
+
+    device = Device(
+        device_code=body.device_code,
+        location=body.location,
+        status="offline",
+    )
+    db.add(device)
+    await db.flush()
+
+    return {
+        "id": str(device.id),
+        "device_code": device.device_code,
+        "location": device.location,
+        "status": device.status,
+    }
+
+
+@router.put("/{device_id}")
+async def update_device(device_id: str, body: UpdateDeviceRequest, db: AsyncSession = Depends(get_db)):
+    """Update a device."""
+    result = await db.execute(select(Device).where(Device.id == device_id))
+    device = result.scalar_one_or_none()
+    if not device:
+        raise HTTPException(status_code=404, detail="Thiết bị không tồn tại")
+
+    if body.device_code is not None and body.device_code != device.device_code:
+        existing = await db.execute(select(Device).where(Device.device_code == body.device_code))
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail=f"Mã thiết bị '{body.device_code}' đã tồn tại")
+        device.device_code = body.device_code
+
+    if body.location is not None:
+        device.location = body.location
+
+    return {
+        "id": str(device.id),
+        "device_code": device.device_code,
+        "location": device.location,
+        "status": device.status,
+    }
+
+
+@router.delete("/{device_id}")
+async def delete_device(device_id: str, db: AsyncSession = Depends(get_db)):
+    """Delete a device (only if no active tasks)."""
+    result = await db.execute(select(Device).where(Device.id == device_id))
+    device = result.scalar_one_or_none()
+    if not device:
+        raise HTTPException(status_code=404, detail="Thiết bị không tồn tại")
+
+    # Check active tasks
+    active_tasks = await db.execute(
+        select(PickingTask).where(
+            PickingTask.device_id == device.id,
+            PickingTask.status.in_(["waiting", "active"]),
+        )
+    )
+    if active_tasks.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Thiết bị đang có task hoạt động, không thể xoá")
+
+    await db.delete(device)
+    return {"ok": True, "message": f"Đã xoá thiết bị '{device.device_code}'"}
+
+
 @router.post("/{device_id}/test-led")
 async def test_led(device_id: str, body: dict = None, db: AsyncSession = Depends(get_db)):
     """
@@ -112,12 +191,10 @@ async def test_led(device_id: str, body: dict = None, db: AsyncSession = Depends
 
     color = (body or {}).get("color", "#00FF00")
     duration = (body or {}).get("duration", 3)
-    zone_name = _slugify(device.zone.name) if device.zone else "unknown"
 
     # Send led_on command
     commands = [
         {
-            "zone_id": zone_name,
             "device_id": device.device_code,
             "action": "led_on",
             "color": color,

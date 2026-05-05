@@ -45,7 +45,6 @@ const navItems = computed(() => {
     { icon: 'fa fa-th-large', label: 'Dashboard', to: '/' },
     { icon: 'fa fa-list-alt', label: 'Đơn hàng', to: '/orders', badge: 3 },
     { icon: 'fa fa-microchip', label: 'Thiết bị', to: '/devices' },
-    { icon: 'fa fa-map-marker-alt', label: 'Zones', to: '/zones' },
     { icon: 'fa fa-bar-chart', label: 'Báo cáo', to: '/reports' },
     { icon: 'fa fa-flask', label: 'Tạo đơn giả', to: '/mock-order' },
   ]

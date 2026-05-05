@@ -7,15 +7,12 @@
       </div>
       <div class="header-actions">
         <button class="btn btn-ghost" @click="fetchDevices"><i class="fa fa-sync"></i> Làm mới</button>
+        <button class="btn btn-primary" @click="openCreateModal">+ Thêm thiết bị</button>
       </div>
     </div>
 
     <!-- Filters -->
     <div class="filters card">
-      <select class="input filter-select" v-model="filterZone">
-        <option value="">Tất cả Zone</option>
-        <option v-for="z in zones" :key="z" :value="z">{{ z }}</option>
-      </select>
       <select class="input filter-select" v-model="filterStatus">
         <option value="">Tất cả trạng thái</option>
         <option value="online">Online</option>
@@ -31,7 +28,6 @@
         <thead>
           <tr>
             <th>Mã</th>
-            <th>Zone</th>
             <th>Vị trí</th>
             <th>Trạng thái</th>
             <th>Lần cuối online</th>
@@ -40,16 +36,15 @@
         </thead>
         <tbody>
           <tr v-if="loading">
-            <td colspan="7" class="text-center text-muted">
+            <td colspan="5" class="text-center text-muted">
               <i class="fa fa-spinner fa-spin"></i> Đang tải...
             </td>
           </tr>
           <tr v-else-if="filteredDevices.length === 0">
-            <td colspan="7" class="text-center text-muted">Không có thiết bị nào</td>
+            <td colspan="5" class="text-center text-muted">Không có thiết bị nào</td>
           </tr>
           <tr v-for="device in paginatedDevices" :key="device.id">
             <td><strong>{{ device.device_code }}</strong></td>
-            <td>{{ device.zone || '—' }}</td>
             <td class="text-muted">{{ device.location || '—' }}</td>
             <td>
               <span class="badge" :class="'badge-' + device.status">
@@ -59,14 +54,22 @@
             </td>
             <td class="text-muted">{{ formatDate(device.last_seen) }}</td>
             <td>
-              <button
-                class="btn btn-sm btn-primary"
-                @click="testLed(device)"
-                :disabled="testingDevice === device.id"
-              >
-                <i :class="testingDevice === device.id ? 'fa fa-spinner fa-spin' : 'fa fa-lightbulb'"></i>
-                Test
-              </button>
+              <div class="action-btns">
+                <button
+                  class="btn btn-sm btn-primary"
+                  @click="testLed(device)"
+                  :disabled="testingDevice === device.id"
+                >
+                  <i :class="testingDevice === device.id ? 'fa fa-spinner fa-spin' : 'fa fa-lightbulb'"></i>
+                  Test
+                </button>
+                <button class="btn btn-sm btn-ghost" @click="openEditModal(device)" title="Sửa">
+                  <i class="fa fa-pen"></i>
+                </button>
+                <button class="btn btn-sm btn-ghost text-danger" @click="deleteDevice(device)" title="Xoá">
+                  <i class="fa fa-trash"></i>
+                </button>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -85,6 +88,29 @@
       <i :class="testResult.ok ? 'fa fa-check-circle' : 'fa fa-exclamation-circle'"></i>
       {{ testResult.message }}
     </div>
+
+    <!-- Create/Edit Modal -->
+    <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
+      <div class="modal card">
+        <h3><i class="fa fa-microchip"></i> {{ editingDevice ? 'Sửa thiết bị' : 'Thêm thiết bị' }}</h3>
+        <div class="form-group">
+          <label>Mã thiết bị</label>
+          <input class="input" v-model="form.device_code" placeholder="PTL-A001" />
+        </div>
+        <div class="form-group">
+          <label>Vị trí</label>
+          <input class="input" v-model="form.location" placeholder="A/Row1/Slot01" />
+        </div>
+        <div v-if="formError" class="form-error">{{ formError }}</div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" @click="closeModal">Huỷ</button>
+          <button class="btn btn-primary" @click="submitDevice" :disabled="saving">
+            <i :class="saving ? 'fa fa-spinner fa-spin' : 'fa fa-check'"></i>
+            {{ editingDevice ? 'Cập nhật' : 'Tạo' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -96,7 +122,6 @@ const { authFetch } = useAuth()
 
 const loading = ref(false)
 const devices = ref([])
-const filterZone = ref('')
 const filterStatus = ref('')
 const searchQuery = ref('')
 const page = ref(1)
@@ -104,17 +129,18 @@ const perPage = 20
 const testingDevice = ref(null)
 const testResult = ref(null)
 
-const zones = computed(() => {
-  const zoneSet = new Set(devices.value.map(d => d.zone).filter(Boolean))
-  return [...zoneSet].sort()
-})
+// Modal state
+const showModal = ref(false)
+const editingDevice = ref(null)
+const saving = ref(false)
+const formError = ref('')
+const form = ref({ device_code: '', location: '' })
 
 const filteredDevices = computed(() => {
   return devices.value.filter(d => {
-    const matchZone = !filterZone.value || d.zone === filterZone.value
     const matchStatus = !filterStatus.value || d.status === filterStatus.value
     const matchSearch = !searchQuery.value || d.device_code.toLowerCase().includes(searchQuery.value.toLowerCase())
-    return matchZone && matchStatus && matchSearch
+    return matchStatus && matchSearch
   })
 })
 
@@ -140,6 +166,73 @@ async function fetchDevices() {
   }
 }
 
+// ─── CRUD ─────────────────────────────────────────────────
+function openCreateModal() {
+  editingDevice.value = null
+  form.value = { device_code: '', location: '' }
+  formError.value = ''
+  showModal.value = true
+}
+
+function openEditModal(device) {
+  editingDevice.value = device
+  form.value = { device_code: device.device_code, location: device.location || '' }
+  formError.value = ''
+  showModal.value = true
+}
+
+function closeModal() {
+  showModal.value = false
+  editingDevice.value = null
+  formError.value = ''
+}
+
+async function submitDevice() {
+  if (!form.value.device_code.trim()) {
+    formError.value = 'Mã thiết bị không được để trống'
+    return
+  }
+  saving.value = true
+  formError.value = ''
+  try {
+    const url = editingDevice.value
+      ? `/api/devices/${editingDevice.value.id}`
+      : '/api/devices/'
+    const method = editingDevice.value ? 'PUT' : 'POST'
+
+    const res = await authFetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form.value),
+    })
+    const data = await res.json()
+    if (res.ok) {
+      closeModal()
+      await fetchDevices()
+      showToast(true, editingDevice.value ? 'Cập nhật thành công' : 'Thêm thiết bị thành công')
+    } else {
+      formError.value = data.detail || 'Lỗi không xác định'
+    }
+  } catch {
+    formError.value = 'Lỗi kết nối'
+  } finally {
+    saving.value = false
+  }
+}
+
+async function deleteDevice(device) {
+  if (!confirm(`Xoá thiết bị "${device.device_code}"?`)) return
+  const res = await authFetch(`/api/devices/${device.id}`, { method: 'DELETE' })
+  if (res.ok) {
+    await fetchDevices()
+    showToast(true, `Đã xoá ${device.device_code}`)
+  } else {
+    const data = await res.json()
+    showToast(false, data.detail || 'Xoá thất bại')
+  }
+}
+
+// ─── Test LED ─────────────────────────────────────────────
 async function testLed(device) {
   testingDevice.value = device.id
   testResult.value = null
@@ -151,17 +244,21 @@ async function testLed(device) {
     })
     const data = await res.json()
     if (res.ok) {
-      testResult.value = { ok: true, message: data.message }
+      showToast(true, data.message)
     } else {
-      testResult.value = { ok: false, message: data.detail || 'Test thất bại' }
+      showToast(false, data.detail || 'Test thất bại')
     }
     await fetchDevices()
   } catch {
-    testResult.value = { ok: false, message: 'Lỗi kết nối' }
+    showToast(false, 'Lỗi kết nối')
   } finally {
     testingDevice.value = null
-    setTimeout(() => { testResult.value = null }, 4000)
   }
+}
+
+function showToast(ok, message) {
+  testResult.value = { ok, message }
+  setTimeout(() => { testResult.value = null }, 4000)
 }
 
 function formatDate(iso) {
@@ -204,15 +301,6 @@ function formatDate(iso) {
 }
 .status-indicator.online { background: var(--success); }
 .status-indicator.offline { background: var(--danger); }
-.status-indicator.active { background: var(--warning); animation: blink-led 1s infinite; }
-
-.led-indicator {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-  box-shadow: 0 0 8px currentColor;
-}
 
 .pagination {
   display: flex;
@@ -248,4 +336,10 @@ function formatDate(iso) {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Form */
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 4px; }
+.form-error { color: var(--danger); font-size: 0.82rem; margin-bottom: 10px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 </style>
